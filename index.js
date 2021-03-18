@@ -12,44 +12,35 @@
     brokers: ['pvdevkafka01:9092']
   })
 
-  const consumer = kafka.consumer({ groupId: 'test-group' })
+  const consumer = kafka.consumer({ groupId: 'offsetter' })
 
   await consumer.connect()
   await consumer.subscribe({ topic: 'fhir4.capybara.firefly.medicom.observation', offset: '20139091' })
 
+  /* inspired by: https://kafka.js.org/docs/consuming#example */
   await consumer.run({
     autoCommit: false,
     eachBatchAutoResolve: true,
-    eachBatch: async ({
-        batch,
-        resolveOffset,
-        heartbeat,
-        commitOffsetsIfNecessary,
-        uncommittedOffsets,
-        isRunning,
-        isStale,
-    }) => {
-        if (isStale()) {
-          return
-        }
-        for (let message of batch.messages) {
-            console.log({
-                topic: batch.topic,
-                partition: batch.partition,
-                highWatermark: batch.highWatermark,
-                message: {
-                    offset: message.offset,
-                    key: message.key.toString(),
-                    value: message.value.toString(),
-                    headers: message.headers,
-                }
-            })
-            consumer.pause()
-            break;
-            // resolveOffset(message.offset)
-            // await heartbeat()
-        }
-    },
+    eachBatch: async ({ batch, isStale }) => {
+      if (isStale()) {
+        return
+      }
+      for (let message of batch.messages) {
+        console.log({
+          topic: batch.topic,
+          partition: batch.partition,
+          highWatermark: batch.highWatermark,
+          message: {
+            offset: message.offset,
+            key: message.key.toString(),
+            value: message.value.toString(),
+            headers: message.headers
+          }
+        })
+        consumer.pause()
+        break
+      }
+    }
   })
   
   await consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition: 0, offset: 20139091 })
