@@ -29,9 +29,9 @@
       const { topic, offset } = req.body
       DEBUG && consoleLog('GET KAFKA', topic, offset)
       await consumer.connect()
+      await consumer.subscribe({ topic, fromBeginning: true })
       let kafkaMessage = {}
       try {
-        await consumer.subscribe({ topic, offset })
         await consumer.run({
           autoCommit: false,
           eachBatchAutoResolve: true,
@@ -51,6 +51,7 @@
                   headers: message.headers
                 }
               }
+              consumer.pause([{ topic: batch.topic, partitions: [batch.partition] }])
               console.log('OFFSET', kafkaMessage)
               consumer.disconnect()
               break
@@ -58,6 +59,7 @@
             res.end(JSON.stringify(kafkaMessage))
           }
         })
+        consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition: 0, offset })
       } catch(err) {
         consoleLog(err)
         res.end({ 'error': err.message })
