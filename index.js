@@ -1,6 +1,6 @@
 (async _ => {
 
-  const DEBUG = true
+  const DEBUG = false
   const apiPort = process.env.APIPORT || 4444
   const express = require('express')
   const app = express()
@@ -26,11 +26,21 @@
   const api = async (req, res) => {
     try {
       res.setHeader('Content-Type', 'application/json')
-      const { topic, offset } = req.body
+      console.log(req.method)
+      let topic, offset
+      if (req.method === 'POST') {
+        topic = req.body.topic
+        offset = req.body.offset
+      } 
+      if (req.method === 'GET') {
+        topic = req.params.topic
+        offset = req.params.offset
+      }
       DEBUG && consoleLog('GET KAFKA', topic, offset)
       await consumer.connect()
       await consumer.subscribe({ topic, fromBeginning: true })
       let kafkaMessage = {}
+      let partition = 0
       try {
         await consumer.run({
           autoCommit: false,
@@ -51,26 +61,28 @@
                   headers: message.headers
                 }
               }
+              partition = batch.partition
+              DEBUG && consoleLog('OFFSET', kafkaMessage)
               consumer.pause([{ topic: batch.topic, partitions: [batch.partition] }])
-              console.log('OFFSET', kafkaMessage)
               consumer.disconnect()
               break
             }
             res.end(JSON.stringify(kafkaMessage))
           }
         })
-        consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition: 0, offset })
+        consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition, offset })
       } catch(err) {
         consoleLog(err)
         res.end({ 'error': err.message })
       }
     } catch(err) {
       consoleLog(err)
-      res.end({ 'error': err.message })
+      res.end({ 'catched': err.message })
     }
   }
 
-  app.post('/api/v1/:topic/:offset', api)
+  app.get('/api/v1/:topic/:offset', api)
+  app.post('/api/v1/kafka', api)
 
   app.listen(apiPort, _ => 
     consoleLog('Offsetter at port', apiPort)
