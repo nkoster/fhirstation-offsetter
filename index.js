@@ -1,10 +1,10 @@
 (async _ => {
 
   const DEBUG = true
+  const apiPort = process.env.APIPORT || 4444
   const express = require('express')
   const app = express()
   const cors = require('cors')
-
   const { Kafka } = require('kafkajs')
 
   const kafka = new Kafka({
@@ -14,50 +14,58 @@
 
   const consumer = kafka.consumer({ groupId: 'offsetter' })
 
-  await consumer.connect()
-  await consumer.subscribe({ topic: 'fhir4.capybara.firefly.medicom.observation', offset: '20139091' })
-
-  /* inspired by: https://kafka.js.org/docs/consuming#example */
-  await consumer.run({
-    autoCommit: false,
-    eachBatchAutoResolve: true,
-    eachBatch: async ({ batch, isStale }) => {
-      if (isStale()) {
-        return
-      }
-      for (let message of batch.messages) {
-        console.log({
-          topic: batch.topic,
-          partition: batch.partition,
-          highWatermark: batch.highWatermark,
-          message: {
-            offset: message.offset,
-            key: message.key.toString(),
-            value: message.value.toString(),
-            headers: message.headers
-          }
-        })
-        consumer.pause()
-        break
-      }
-    }
-  })
-  
-  await consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition: 0, offset: 20139091 })
-  
   const consoleLog = (...args) => {
     process.stdout.write(`${new Date().toUTCString()}:`)
-    args.forEach(arg => process.stdout.write(` ${arg.toString()}`))
+    args.forEach(arg => process.stdout.write(` ${arg?.toString()}`))
     process.stdout.write('\n')
   }
-
-  const apiPort = process.env.APIPORT || 4444
 
   app.use(cors())
   app.use(express.json())
 
   const api = async (req, res) => {
-    consoleLog(req.body)
+    try {
+      res.setHeader('Content-Type', 'application/json')
+      const { topic, offset } = req.body
+      DEBUG && consoleLog('GET KAFKA', topic, offset)
+      await consumer.connect()
+      let kafkaMessage = {}
+      try {
+        await consumer.subscribe({ topic, offset })
+        await consumer.run({
+          autoCommit: false,
+          eachBatchAutoResolve: true,
+          eachBatch: async ({ batch, isStale }) => {
+            if (isStale()) {
+              return
+            }
+            for (let message of batch.messages) {
+              kafkaMessage = {
+                topic: batch.topic,
+                partition: batch.partition,
+                highWatermark: batch.highWatermark,
+                message: {
+                  offset: message.offset,
+                  key: message.key.toString(),
+                  value: message.value.toString(),
+                  headers: message.headers
+                }
+              }
+              console.log('OFFSET', kafkaMessage)
+              consumer.disconnect()
+              break
+            }
+            res.end(JSON.stringify(kafkaMessage))
+          }
+        })
+      } catch(err) {
+        consoleLog(err)
+        res.end({ 'error': err.message })
+      }
+    } catch(err) {
+      consoleLog(err)
+      res.end({ 'error': err.message })
+    }
   }
 
   app.post('/api/v1/:topic/:offset', api)
