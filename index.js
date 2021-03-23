@@ -37,8 +37,12 @@
         offset = req.params.offset
       }
       DEBUG && consoleLog('GET KAFKA', topic, offset)
-      await consumer.connect()
-      await consumer.subscribe({ topic, fromBeginning: true })
+      try {
+        await consumer.disconnect()
+        await consumer.connect()
+        await consumer.subscribe({ topic, fromBeginning: true })      } catch(err) {
+        consoleLog(err)
+      }
       let kafkaMessage = {}
       let partition = 0
       try {
