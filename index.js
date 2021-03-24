@@ -40,7 +40,8 @@
       try {
         await consumer.disconnect()
         await consumer.connect()
-        await consumer.subscribe({ topic, fromBeginning: true })      } catch(err) {
+        await consumer.subscribe({ topic, fromBeginning: true })      
+      } catch(err) {
         consoleLog(err)
       }
       let kafkaMessage = {}
