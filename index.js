@@ -75,7 +75,7 @@
             res.end(JSON.stringify(kafkaMessage))
           }
         })
-        consumer.seek({ topic: 'fhir4.capybara.firefly.medicom.observation', partition, offset })
+        consumer.seek({ topic, partition, offset })
       } catch(err) {
         consoleLog(err)
         res.end({ 'error': err.message })
