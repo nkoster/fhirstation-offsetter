@@ -6,7 +6,7 @@
   const app = express()
   const cors = require('cors')
 
-  const broker = 'pvdevkafka01'
+  const broker = '192.168.67.33'
 
   const { exec } = require('child_process')
   const execute = (cmd, callback) => exec(cmd, (_, stdout) => callback(stdout))
@@ -15,6 +15,7 @@
   app.use(express.json())
 
   const api = async (req, res) => {
+
     res.setHeader('Content-Type', 'application/json')
     let topic, partition, offset
     if (req.method === 'POST') {
@@ -27,7 +28,7 @@
       partition = req.params.partition
       offset = req.params.offset
     }
-    console.log(topic, partition, offset)
+    console.log(req.method, topic, partition, offset)
     const data = await new Promise((resolve, reject) => {
       try {
         const cmd = `kafkacat -C -b ${broker} -t ${topic} -p ${partition} -o ${offset} -c 1 -e -q`
