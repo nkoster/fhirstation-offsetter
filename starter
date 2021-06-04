@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+
+docker run --rm --add-host=pvdevkafka01.mgt.portavita.nl:192.168.67.33 --name offsetter -p4444:4444 nkoster/offsetter
