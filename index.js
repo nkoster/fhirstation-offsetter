@@ -1,12 +1,15 @@
 (async _ => {
 
+  require('dotenv').config()
+
+  const jwt = require('jsonwebtoken')
   const DEBUG = false
   const apiPort = process.env.APIPORT || 4444
   const express = require('express')
   const app = express()
   const cors = require('cors')
 
-  const broker = '192.168.67.33'
+  const broker = 'pvdevkafka01'
 
   const { exec } = require('child_process')
   const execute = (cmd, callback) => exec(cmd, (_, stdout) => callback(stdout))
@@ -41,8 +44,23 @@
     res.end(data)
   }
 
-  app.get('/api/v1/:topic/:offset', api)
-  app.post('/api/v1/kafka', api)
+  const authenticateToken = (req, res, next) => {
+    const authHeader = req.headers['authorization']
+    const token = authHeader && authHeader.split(' ')[1]
+    if (!token) {
+      return res.redirect('/')
+    }
+    jwt.verify(token, process.env.ACCESS_TOKEN_SECRET, (err, user) => {
+      if (err) {
+        return res.redirect('/')
+      }
+      req.user = user
+      next()
+    })
+  }
+
+  app.get('/api/v1/:topic/:offset', authenticateToken, api)
+  app.post('/api/v1/kafka', authenticateToken, api)
 
   app.listen(apiPort, _ => 
     console.log('Offsetter at port', apiPort)
